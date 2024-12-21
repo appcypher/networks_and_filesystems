@@ -1,0 +1,13 @@
+[package]
+name = "network"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tun = { version = "0.7", features = ["async"] }
+futures = "0.3"
+default-net = "0.21.0"
