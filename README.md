@@ -1,10 +1,12 @@
 # Network Interface Creator
 
-A system daemon for managing TUN devices via a REST API, supporting both Linux and macOS systems.
+A system daemon for managing network interfaces via REST APIs, supporting both Linux and macOS systems.
 
 ## Features
 
-- REST API for TUN interface management
+- REST APIs for network interface management:
+  - TUN interface creation and management
+  - Subnet configuration and management
 - Automatic subnet allocation in 10.0.0.0/8 range
 - Secure daemon operation with proper privilege handling
 - Comprehensive logging system
@@ -20,9 +22,11 @@ A system daemon for managing TUN devices via a REST API, supporting both Linux a
 
 ## Installation
 
+### TUN Daemon
+
 ```bash
-# Build and install
-make install
+# Build and install TUN daemon
+make install_tun
 ```
 
 The installation process:
@@ -34,23 +38,49 @@ The installation process:
    - Linux: systemd service
    - macOS: launchd daemon
 
+### Subnet Daemon
+
+```bash
+# Build and install Subnet daemon
+make install
+```
+
+The installation process:
+
+1. Builds the release binary
+2. Installs it to `/usr/local/bin/subnet-daemon`
+3. Sets up log files in `/var/log/`
+4. Configures and starts the system service:
+   - Linux: systemd service
+   - macOS: launchd daemon
+
 ## Uninstallation
+
+### TUN Daemon
+
+```bash
+make uninstall_tun
+```
+
+### Subnet Daemon
 
 ```bash
 make uninstall
 ```
 
-This will:
+These commands will:
 
-1. Stop the daemon service
+1. Stop the respective daemon service
 2. Remove all installed files
 3. Clean up system service configurations
 
 ## Usage
 
-The daemon runs a REST API server on `localhost:3030` with the following endpoints:
+### TUN Interface Management
 
-### Create a TUN device
+The TUN daemon runs a REST API server on `localhost:3030` with the following endpoints:
+
+#### Create a TUN device
 
 ```bash
 curl -X POST http://localhost:3030/tun -H "Content-Type: application/json" -d '{"name": "optional_name"}'
@@ -67,7 +97,7 @@ Response:
 }
 ```
 
-### List TUN devices
+#### List TUN devices
 
 ```bash
 curl http://localhost:3030/tun
@@ -86,21 +116,70 @@ Response:
 ]
 ```
 
+### Subnet Management
+
+The subnet daemon runs a REST API server on `localhost:3031` with the following endpoints:
+
+#### Create a subnet
+
+```bash
+curl -X POST http://localhost:3031/subnet -H "Content-Type: application/json" -d '{"cidr": "10.1.0.0/24"}'
+```
+
+Response:
+
+```json
+{
+  "network": "10.1.0.0/24",
+  "interface": "lo0:0"  # on macOS, or a dummy interface name on Linux
+}
+```
+
+#### List subnets
+
+```bash
+curl http://localhost:3031/subnet
+```
+
+Response:
+
+```json
+[
+  {
+    "network": "10.1.0.0/24",
+    "interface": "lo0:0"
+  }
+]
+```
+
+#### Delete a subnet
+
+```bash
+curl -X DELETE http://localhost:3031/subnet/10.1.0.0%2F24
+```
+
 ## Logging
 
 Logs are split between:
 
-- `/var/log/tun-daemon.log`: INFO, DEBUG, and TRACE level logs
-- `/var/log/tun-daemon.err`: ERROR and WARN level logs
+### TUN Daemon
+
+- `/var/log/tun_daemon.log`: INFO, DEBUG, and TRACE level logs
+- `/var/log/tun_daemon.err`: ERROR and WARN level logs
+
+### Subnet Daemon
+
+- `/var/log/subnet_daemon.log`: INFO, DEBUG, and TRACE level logs
+- `/var/log/subnet_daemon.err`: ERROR and WARN level logs
 
 ## Security
 
-The daemon implements several security measures:
+The daemons implement several security measures:
 
 ### Linux
 
-- Runs as root with restricted capabilities
-- Uses systemd security features:
+- Run as root with restricted capabilities
+- Use systemd security features:
   - Capability bounding (CAP_NET_ADMIN)
   - No new privileges
   - Protected system and home
@@ -109,6 +188,6 @@ The daemon implements several security measures:
 
 ### macOS
 
-- Runs as root with wheel group
-- Uses launchd's security features
+- Run as root with wheel group
+- Use launchd's security features
 - Proper file permissions for all components
