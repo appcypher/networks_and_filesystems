@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "network",
+    "nfs4",
 ]
 
 [workspace.package]
