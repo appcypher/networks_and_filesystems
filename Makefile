@@ -1,109 +1,79 @@
-.PHONY: build install uninstall clean
+.PHONY: build install uninstall install_tun uninstall_tun clean
 
-UNAME := $(shell uname)
-NETWORK_DIR := network
-RELEASE_BIN := target/release/tun_daemon
+INSTALL_PATH=/usr/local/bin
+SYSTEMD_PATH=/etc/systemd/system
+LAUNCHD_PATH=/Library/LaunchDaemons
 
 build:
-	sudo cargo build --release --bin tun_daemon
+	sudo cargo build --release -p network
 
 install: build
-	@if [ ! -f $(RELEASE_BIN) ]; then \
-		echo "Error: Binary not found at $(RELEASE_BIN). Build failed?"; \
-		exit 1; \
+	# Install subnet daemon binary
+	sudo install -m 755 target/release/subnet_daemon $(INSTALL_PATH)/subnet-daemon
+	# Create log files with proper permissions
+	sudo touch /var/log/subnet_daemon.log /var/log/subnet_daemon.err
+	sudo chmod 644 /var/log/subnet_daemon.log /var/log/subnet_daemon.err
+	sudo chown root:wheel /var/log/subnet_daemon.log /var/log/subnet_daemon.err
+	# Install service files based on OS
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sudo install -m 644 network/com.subnet.daemon.plist $(LAUNCHD_PATH)/com.subnet.daemon.plist; \
+		sudo launchctl load $(LAUNCHD_PATH)/com.subnet.daemon.plist; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		sudo install -m 644 network/subnet_daemon.service $(SYSTEMD_PATH)/subnet_daemon.service; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable subnet_daemon.service; \
+		sudo systemctl start subnet_daemon.service; \
 	fi
-ifeq ($(UNAME), Darwin)
-	@if [ ! -f $(NETWORK_DIR)/com.tun.daemon.plist ]; then \
-		echo "Error: com.tun.daemon.plist not found"; \
-		exit 1; \
-	fi
-	sudo mkdir -p /usr/local/bin
-	sudo cp $(RELEASE_BIN) /usr/local/bin/tun_daemon
-	sudo chmod 755 /usr/local/bin/tun_daemon
-	sudo chown root:wheel /usr/local/bin/tun_daemon
-
-	# Create and set permissions for log files
-	sudo touch /var/log/tun_daemon.log /var/log/tun_daemon.err
-	sudo chmod 644 /var/log/tun_daemon.log /var/log/tun_daemon.err
-	sudo chown root:wheel /var/log/tun_daemon.log /var/log/tun_daemon.err
-
-	# Create and set permissions for PID file
-	sudo touch /var/run/tun_daemon.pid
-	sudo chmod 644 /var/run/tun_daemon.pid
-	sudo chown root:wheel /var/run/tun_daemon.pid
-
-	# Install and load the launch daemon
-	sudo cp $(NETWORK_DIR)/com.tun.daemon.plist /Library/LaunchDaemons/
-	sudo chown root:wheel /Library/LaunchDaemons/com.tun.daemon.plist
-	sudo chmod 644 /Library/LaunchDaemons/com.tun.daemon.plist
-	sudo launchctl unload /Library/LaunchDaemons/com.tun.daemon.plist 2>/dev/null || true
-	sudo launchctl load -w /Library/LaunchDaemons/com.tun.daemon.plist
-else ifeq ($(UNAME), Linux)
-	@if [ ! -f $(NETWORK_DIR)/tun_daemon.service ]; then \
-		echo "Error: tun_daemon.service not found"; \
-		exit 1; \
-	fi
-	sudo mkdir -p /usr/local/bin
-	sudo cp $(RELEASE_BIN) /usr/local/bin/tun_daemon
-	sudo chmod 755 /usr/local/bin/tun_daemon
-	sudo chown root:wheel /usr/local/bin/tun_daemon
-
-	# Create and set permissions for log files
-	sudo touch /var/log/tun_daemon.log /var/log/tun_daemon.err
-	sudo chmod 644 /var/log/tun_daemon.log /var/log/tun_daemon.err
-	sudo chown root:wheel /var/log/tun_daemon.log /var/log/tun_daemon.err
-
-	# Create and set permissions for PID file
-	sudo touch /var/run/tun_daemon.pid
-	sudo chmod 644 /var/run/tun_daemon.pid
-	sudo chown root:wheel /var/run/tun_daemon.pid
-
-	# Install and enable the systemd service
-	sudo cp $(NETWORK_DIR)/tun_daemon.service /etc/systemd/system/
-	sudo chmod 644 /etc/systemd/system/tun_daemon.service
-	sudo systemctl daemon-reload
-	sudo systemctl enable tun_daemon
-	sudo systemctl restart tun_daemon
-endif
 
 uninstall:
-ifeq ($(UNAME), Darwin)
-	# First try graceful termination through launchctl
-	sudo launchctl unload /Library/LaunchDaemons/com.tun.daemon.plist 2>/dev/null || true
+	# Stop and remove service based on OS
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sudo launchctl unload $(LAUNCHD_PATH)/com.subnet.daemon.plist || true; \
+		sudo rm -f $(LAUNCHD_PATH)/com.subnet.daemon.plist; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		sudo systemctl stop subnet_daemon.service || true; \
+		sudo systemctl disable subnet_daemon.service || true; \
+		sudo rm -f $(SYSTEMD_PATH)/subnet_daemon.service; \
+		sudo systemctl daemon-reload; \
+	fi
+	# Remove binary and logs
+	sudo rm -f $(INSTALL_PATH)/subnet-daemon
+	sudo rm -f /var/log/subnet_daemon.log /var/log/subnet_daemon.err
+	sudo rm -f /var/run/subnet_daemon.pid
 
-	# If process is still running, force kill it
-	@if [ -f /var/run/tun_daemon.pid ]; then \
-		PID=$$(cat /var/run/tun_daemon.pid); \
-		if ps -p $$PID > /dev/null; then \
-			echo "Force killing daemon process..."; \
-			sudo kill -9 $$PID || true; \
-		fi \
+install_tun: build
+	# Install TUN daemon binary
+	sudo install -m 755 target/release/tun_daemon $(INSTALL_PATH)/tun-daemon
+	# Create log files with proper permissions
+	sudo touch /var/log/tun_daemon.log /var/log/tun_daemon.err
+	sudo chmod 644 /var/log/tun_daemon.log /var/log/tun_daemon.err
+	sudo chown root:wheel /var/log/tun_daemon.log /var/log/tun_daemon.err
+	# Install service files based on OS
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sudo install -m 644 network/com.tun.daemon.plist $(LAUNCHD_PATH)/com.tun.daemon.plist; \
+		sudo launchctl load $(LAUNCHD_PATH)/com.tun.daemon.plist; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		sudo install -m 644 network/tun_daemon.service $(SYSTEMD_PATH)/tun_daemon.service; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable tun_daemon.service; \
+		sudo systemctl start tun_daemon.service; \
 	fi
 
-	sudo rm -f /Library/LaunchDaemons/com.tun.daemon.plist
-	sudo rm -f /usr/local/bin/tun_daemon
-	sudo rm -f /var/log/tun_daemon.log /var/log/tun_daemon.err
-	sudo rm -f /var/run/tun_daemon.pid
-else ifeq ($(UNAME), Linux)
-	# Stop and disable the service
-	sudo systemctl stop tun_daemon || true
-	sudo systemctl disable tun_daemon || true
-
-	# If process is still running, force kill it
-	@if [ -f /var/run/tun_daemon.pid ]; then \
-		PID=$$(cat /var/run/tun_daemon.pid); \
-		if ps -p $$PID > /dev/null; then \
-			echo "Force killing daemon process..."; \
-			sudo kill -9 $$PID || true; \
-		fi \
+uninstall_tun:
+	# Stop and remove service based on OS
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		sudo launchctl unload $(LAUNCHD_PATH)/com.tun.daemon.plist || true; \
+		sudo rm -f $(LAUNCHD_PATH)/com.tun.daemon.plist; \
+	elif [ "$$(uname)" = "Linux" ]; then \
+		sudo systemctl stop tun_daemon.service || true; \
+		sudo systemctl disable tun_daemon.service || true; \
+		sudo rm -f $(SYSTEMD_PATH)/tun_daemon.service; \
+		sudo systemctl daemon-reload; \
 	fi
-
-	sudo rm -f /etc/systemd/system/tun_daemon.service
-	sudo rm -f /usr/local/bin/tun_daemon
+	# Remove binary and logs
+	sudo rm -f $(INSTALL_PATH)/tun-daemon
 	sudo rm -f /var/log/tun_daemon.log /var/log/tun_daemon.err
 	sudo rm -f /var/run/tun_daemon.pid
-	sudo systemctl daemon-reload
-endif
 
 clean:
 	cargo clean

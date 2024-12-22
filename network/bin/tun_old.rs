@@ -1,31 +1,9 @@
-use anyhow::Result;
-use default_net;
-use serde::{Deserialize, Serialize};
+use anyhow::{Context, Result};
+use futures::StreamExt;
 use std::net::Ipv4Addr;
-use tun::AbstractDevice;
+use tun::Configuration;
 
-//-------------------------------------------------------------------------------------------------
-// Types
-//-------------------------------------------------------------------------------------------------
-
-#[derive(Debug, Serialize, Clone)]
-pub struct TunDevice {
-    pub name: String,
-    pub ip_addr: Ipv4Addr,
-    pub netmask: Ipv4Addr,
-    pub broadcast: Ipv4Addr,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateTunRequest {
-    pub name: Option<String>,
-}
-
-//-------------------------------------------------------------------------------------------------
-// Functions
-//-------------------------------------------------------------------------------------------------
-
-pub fn find_available_subnet() -> Result<(Ipv4Addr, Ipv4Addr, Ipv4Addr)> {
+fn find_available_subnet() -> Result<(Ipv4Addr, Ipv4Addr, Ipv4Addr)> {
     let interfaces = default_net::get_interfaces();
 
     // Try subnets from 10.0.0.0 to 10.255.0.0
@@ -58,14 +36,18 @@ pub fn find_available_subnet() -> Result<(Ipv4Addr, Ipv4Addr, Ipv4Addr)> {
     anyhow::bail!("No available subnets found in the 10.0.0.0/8 range")
 }
 
-pub fn create_tun_device(name: Option<String>) -> Result<TunDevice> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    println!("Creating TUN interface...");
+
+    // Find an available subnet
     let (ip_addr, netmask, broadcast) = find_available_subnet()?;
+    println!("Using subnet configuration:");
+    println!("  IP Address: {}", ip_addr);
+    println!("  Netmask: {}", netmask);
+    println!("  Broadcast: {}", broadcast);
 
-    let mut config = tun::Configuration::default();
-    if let Some(name) = name.as_ref() {
-        config.tun_name(name);
-    }
-
+    let mut config = Configuration::default();
     config
         .address(ip_addr)
         .destination(ip_addr)
@@ -82,13 +64,21 @@ pub fn create_tun_device(name: Option<String>) -> Result<TunDevice> {
         config.ensure_root_privileges(true);
     });
 
-    let dev = tun::create_as_async(&config)?;
-    let name = dev.tun_name()?;
+    let dev = tun::create_as_async(&config).context("Failed to create TUN interface")?;
+    println!("TUN interface created successfully!");
 
-    Ok(TunDevice {
-        name,
-        ip_addr,
-        netmask,
-        broadcast,
-    })
+    // Keep the interface alive and print received packets
+    let mut framed = dev.into_framed();
+    while let Some(packet) = framed.next().await {
+        match packet {
+            Ok(packet) => {
+                println!("Received packet: {:?}", packet);
+            }
+            Err(e) => {
+                eprintln!("Error receiving packet: {}", e);
+            }
+        }
+    }
+
+    Ok(())
 }

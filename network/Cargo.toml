@@ -11,11 +11,27 @@ path = "bin/tun_daemon.rs"
 name = "tun"
 path = "bin/tun.rs"
 
+[[bin]]
+name = "tun_old"
+path = "bin/tun_old.rs"
+
+[[bin]]
+name = "subnet"
+path = "bin/subnet.rs"
+
+[[bin]]
+name = "subnet_daemon"
+path = "bin/subnet_daemon.rs"
+
 [dependencies]
 anyhow = "1.0"
 axum = "0.7"
 daemonize = "0.5"
 default-net = "0.22"
+futures = "0.3.31"
+ipnet = { version = "2.10", features = ["serde"] }
+lazy_static = "1.4"
+rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
