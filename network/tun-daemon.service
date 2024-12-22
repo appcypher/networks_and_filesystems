@@ -1,0 +1,21 @@
+[Unit]
+Description=TUN Device Management Daemon
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/tun-daemon
+PIDFile=/var/run/tun-daemon.pid
+Restart=on-failure
+# Security settings
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+
+[Install]
+WantedBy=multi-user.target
