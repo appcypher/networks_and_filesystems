@@ -72,6 +72,16 @@ pub fn create_tun_device(name: Option<String>) -> Result<TunDevice> {
         .netmask(netmask)
         .up();
 
+    #[cfg(target_os = "macos")]
+    config.platform_config(|config| {
+        config.packet_information(true);
+    });
+
+    #[cfg(target_os = "linux")]
+    config.platform_config(|config| {
+        config.ensure_root_privileges(true);
+    });
+    
     let dev = tun::create(&config)?;
     let name = dev.tun_name()?;
 

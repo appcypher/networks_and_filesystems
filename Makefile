@@ -5,7 +5,7 @@ NETWORK_DIR := network
 RELEASE_BIN := target/release/tun_daemon
 
 build:
-	cargo build --release --bin network
+	sudo cargo build --release --bin tun_daemon
 
 install: build
 	@if [ ! -f $(RELEASE_BIN) ]; then \

@@ -14,7 +14,7 @@ A system daemon for managing TUN devices via a REST API. Supports both Linux and
 
 ```bash
 # From the root directory
-sudo make install
+make install
 ```
 
 The installation process will:
@@ -33,7 +33,7 @@ The installation process will:
 
 ```bash
 # From the root directory
-sudo make uninstall
+make uninstall
 ```
 
 This will:
